@@ -1,0 +1,13 @@
+# Install as /etc/systemd/system/dressv-https.service.d/60-provider.conf
+# only when intentionally enabling live generation.
+[Service]
+Environment=DRESSV_PROVIDER=image-edits
+Environment=DRESSV_PROVIDER_ENDPOINT=https://api.openai.com/v1/images/edits
+# Optional when a compatible provider uses a different model identifier.
+# Environment=DRESSV_PROVIDER_MODEL=gpt-image-2.6-sunburst
+LoadCredential=provider-api-key:/etc/dressv/provider-api-key
+# The main unit's IP filter covers both ingress and egress. The application
+# and the dedicated nftables rule still enforce the WordPress source address.
+IPAddressDeny=
+RestrictAddressFamilies=
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX

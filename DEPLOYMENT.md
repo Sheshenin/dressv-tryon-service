@@ -1,6 +1,6 @@
 # Развёртывание и проверка Dress V
 
-Состояние подтверждено 20 ноября 2026 года. Все времена ниже указаны по Москве. На Hermes запущен HTTPS-сервис с тестовым провайдером. Он возвращает синтетический PNG. Плагин WooCommerce, визуальная проверка и рабочий API-провайдер остаются в [плане](PLAN.md).
+Состояние подтверждено 20 ноября 2026 года. Все времена ниже указаны по Москве. На Hermes запущен HTTPS-сервис в режиме `mock`. Для технической разработки плагина подготовлен серверный переключатель на совместимый Images Edits. Плагин WooCommerce, визуальная проверка и первый реальный вызов остаются в [плане](PLAN.md).
 
 ## Хронология
 
@@ -12,6 +12,7 @@
 | 21:43–21:44 | На WordPress запущено реле на приватном Docker-мосту. Добавлено правило UFW с ограничением по интерфейсу, подсети, адресу назначения и порту. Запущен отдельный `tmpfs` с `noswap`. Временный контейнер на том же образе WordPress подтвердил подключение и монтирование до применения настроек к сайту. |
 | 21:45 и далее | Пересоздан только контейнер WordPress, запуск зафиксирован в 21:45:17. Синтетическая загрузка прошла через рабочие Apache и PHP, TLS и сервис Dress V. Ошибки аутентификации, изоляция сессий и удаление проверены. Временный проверочный PHP-файл удалён. |
 | 21:49 | Повторно проверены состояние служб, WordPress и главная страница, срок сертификата, пути, права секретов и SHA-256 развёрнутых исходников и конфигураций. |
+| 22:01 | На Hermes установлен переключатель провайдера. Базовая служба перезапущена в режиме `mock`. 14 тестов прошли, в том числе переключение двух тестовых адресов и ключей. Повторная загрузка из Apache/PHP вернула тестовый PNG и подтвердила его удаление. Счётчик отдельного правила nftables подтвердил блокировку постороннего IPv6-источника. |
 
 ## Где находятся файлы
 
@@ -21,13 +22,16 @@
 | Hermes, исходная ревизия | `/home/hermes-admin/dressv-staging/releases/342b88563c084631f2b82e56feb2919035fe5c17` | Базовый снимок очереди и адаптера OpenAI. |
 | Hermes, HTTP staging | `/home/hermes-admin/dressv-staging/http-mock.tf2RyG` | Код loopback-прогона, тесты и отдельный Python venv. |
 | Hermes, HTTPS staging | `/home/hermes-admin/dressv-staging/https.KtldqJ` | Исходники с TLS и материалы доставки на сервер. |
+| Hermes, staging переключателя | `/home/hermes-admin/dressv-staging/providers.4jZeZa` | Новые исходники, тесты и копии старого unit-файла и модулей в подкаталоге `before`. |
 | Hermes, работающая служба | `/opt/dressv-https/src/dressv`, `/opt/dressv-https/.venv`, `/etc/systemd/system/dressv-https.service` | Код, зависимости и включённая служба из [шаблона systemd](deploy/dressv-https.service). |
+| Hermes, входной фильтр | `/etc/systemd/system/dressv-https-ingress.service`, `/etc/dressv/https-ingress.nft` | Отдельная таблица nftables для входа на порт 18444. |
+| Hermes, переключатель провайдера | `/etc/dressv/provider.conf.example` | Неактивный пример для OpenAI. Для live понадобится systemd drop-in и отдельный ключ. [Настройка](OPENAI-SETUP.md) |
 | Hermes, секреты и сертификаты | `/etc/dressv/{wordpress-token,tls-key,tls-cert,ca-cert}` | Отдельный межсерверный токен и TLS. Токен и закрытый ключ принадлежат root и имеют права `0600`. systemd передаёт службе токен, сертификат и ключ через `LoadCredential`. |
 | WordPress, Compose | `/data/projects/bmk-rental-site/compose.override.yaml` | Дополнительное имя хоста и четыре монтирования только для сервиса `wordpress`. Исходный override сохранён в `/etc/dressv-wordpress/compose.override.before-dressv.yaml`. |
 | WordPress, systemd | `/etc/systemd/system/{dressv-wordpress-relay.socket,dressv-wordpress-relay.service,run-dressvuploads.mount}` | Реле на Docker-мосту и монтирование хранилища загрузок. Исходники установленных файлов находятся в [deploy](deploy/). |
 | WordPress, конфигурация | `/etc/dressv-wordpress/{ca-cert,wordpress-token,upload.ini}` | Публичный CA, токен для PHP и [настройки PHP](deploy/dressv-upload-tmp.ini). Токен имеет права `0400` для UID 33 (`www-data`). |
 
-На момент сверки все шесть файлов Python в `/opt/dressv-https/src/dressv`, три файла systemd на WordPress, HTTPS unit на Hermes и конфигурация PHP совпадали с рабочей копией по SHA-256. В Git сохраняются исходники, шаблоны и пути файлов. Значения токенов и закрытые ключи хранятся на серверах.
+При сверке в 21:49 шесть файлов Python из первоначальной HTTPS-сборки, три файла systemd на WordPress, HTTPS unit на Hermes и конфигурация PHP совпадали с рабочей копией по SHA-256. В 22:01 на Hermes обновлены `__main__.py`, `openai_images.py` и unit, добавлены `providers.py` и входной сетевой фильтр. В Git хранятся исходники, шаблоны и пути файлов. Значения токенов и закрытые ключи хранятся на серверах.
 
 ## Как проходит запрос
 
@@ -66,4 +70,4 @@
 
 1. **Восстановить override WordPress.** Сверить текущий override с резервной копией, чтобы сохранить независимые изменения, внесённые после Dress V. Убрать только настройки Dress V или восстановить резервную копию, если других изменений не было. Пересоздать лишь `wordpress` командой `docker compose up -d --no-deps --no-build --pull never --wait wordpress` из `/data/projects/bmk-rental-site`. Проверить здоровье контейнера и ответ сайта.
 2. **Остановить компоненты WordPress.** Отключить и остановить `dressv-wordpress-relay.socket`, остановить `dressv-wordpress-relay.service`, отключить и остановить `run-dressvuploads.mount`. Удалить только правило UFW с комментарием `dressv-wordpress-relay`.
-3. **Остановить Dress V на Hermes.** Отключить и остановить `dressv-https.service`, проверить закрытие порта 18444 и состояние Hermes Gateway, Xray и сайта.
+3. **Остановить Dress V на Hermes.** Отключить и остановить `dressv-https.service`, затем остановить `dressv-https-ingress.service`, чтобы удалить только таблицу `dressv_https`. Проверить закрытие порта 18444 и состояние Hermes Gateway, Xray и сайта.

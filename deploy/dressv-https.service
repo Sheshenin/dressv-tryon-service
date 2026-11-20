@@ -1,7 +1,8 @@
 [Unit]
 Description=Dress V HTTPS staging service
 Wants=network-online.target
-After=network-online.target
+Requires=dressv-https-ingress.service
+After=network-online.target dressv-https-ingress.service
 
 [Service]
 Type=simple
@@ -9,10 +10,11 @@ DynamicUser=yes
 WorkingDirectory=/opt/dressv-https
 Environment=PYTHONPATH=/opt/dressv-https/src
 Environment=PYTHONDONTWRITEBYTECODE=1
+Environment=DRESSV_PROVIDER=mock
 LoadCredential=wordpress-token:/etc/dressv/wordpress-token
 LoadCredential=tls-cert:/etc/dressv/tls-cert
 LoadCredential=tls-key:/etc/dressv/tls-key
-ExecStart=/opt/dressv-https/.venv/bin/python -m dressv --mock --bind-v6 2404:a140:3d:7::f937 --allow-v6 2a0d:8480:2:241::1 --port 18444
+ExecStart=/opt/dressv-https/.venv/bin/python -m dressv --bind-v6 2404:a140:3d:7::f937 --allow-v6 2a0d:8480:2:241::1 --port 18444
 Restart=on-failure
 TimeoutStopSec=25
 NoNewPrivileges=yes

@@ -1,4 +1,4 @@
-"""Run the internal mock server with a synthetic, generated result."""
+"""Run the internal Dress V server with the configured image provider."""
 
 from __future__ import annotations
 
@@ -9,18 +9,17 @@ import signal
 import ssl
 import sys
 import threading
-from io import BytesIO
 from pathlib import Path
 
-from PIL import Image
-
 from .http import HTTPServer, IPv6HTTPServer
+from .openai_images import ImageEditError
+from .providers import configured_generator, valid_result
 from .service import Service
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--mock", required=True, action="store_true")
+    parser.add_argument("--mock", action="store_true", help="force the synthetic fixture provider")
     parser.add_argument("--port", type=int, default=18444)
     parser.add_argument("--bind-v6", type=ipaddress.IPv6Address)
     parser.add_argument("--allow-v6", type=ipaddress.IPv6Address)
@@ -46,10 +45,11 @@ def main():
         except (OSError, ValueError):
             sys.exit("Cannot load the Dress V TLS credentials")
 
-    with BytesIO() as mock:
-        Image.new("RGB", (64, 96), (78, 80, 128)).save(mock, "PNG")
-        result = mock.getvalue()
-    service = Service(lambda payload, deadline: result, lambda payload, output, deadline: True)
+    try:
+        generate = configured_generator(force_mock=options.mock)
+    except ImageEditError as error:
+        sys.exit(str(error))
+    service = Service(generate, valid_result)
     try:
         with server_type(
             (bind, options.port), service, token, tls=tls,

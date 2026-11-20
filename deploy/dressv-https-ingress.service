@@ -1,0 +1,9 @@
+[Unit]
+Description=Source restriction for the Dress V HTTPS listener
+Before=dressv-https.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/sbin/nft -f /etc/dressv/https-ingress.nft
+ExecStop=/usr/sbin/nft delete table inet dressv_https

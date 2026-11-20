@@ -1,0 +1,6 @@
+table inet dressv_https {
+    chain ingress {
+        type filter hook input priority -12; policy accept;
+        ip6 daddr 2404:a140:3d:7::f937 ip6 saddr != 2a0d:8480:2:241::1 tcp dport 18444 counter drop
+    }
+}
