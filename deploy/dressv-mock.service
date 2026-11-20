@@ -1,0 +1,32 @@
+[Unit]
+Description=Dress V isolated mock for staging
+After=network.target
+
+[Service]
+Type=simple
+DynamicUser=yes
+WorkingDirectory=/opt/dressv-mock
+Environment=PYTHONPATH=/opt/dressv-mock/src
+Environment=PYTHONDONTWRITEBYTECODE=1
+LoadCredential=wordpress-token:/etc/dressv/mock-wordpress-token
+ExecStart=/opt/dressv-mock/.venv/bin/python -m dressv --mock
+Restart=on-failure
+TimeoutStopSec=25
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_INET AF_UNIX
+IPAddressDeny=any
+IPAddressAllow=localhost
+UMask=0077
+LimitCORE=0
+LimitNOFILE=64
+TasksMax=16
+CPUQuota=100%
+MemoryMax=512M
+MemorySwapMax=0

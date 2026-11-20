@@ -1,0 +1,12 @@
+[Unit]
+Description=Non-swappable temporary uploads for WordPress PHP
+Before=docker.service
+
+[Mount]
+What=tmpfs
+Where=/run/dressvuploads
+Type=tmpfs
+Options=rw,nosuid,nodev,noexec,noswap,size=128M,mode=1777
+
+[Install]
+WantedBy=local-fs.target

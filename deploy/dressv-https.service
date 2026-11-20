@@ -1,0 +1,38 @@
+[Unit]
+Description=Dress V HTTPS staging service
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+DynamicUser=yes
+WorkingDirectory=/opt/dressv-https
+Environment=PYTHONPATH=/opt/dressv-https/src
+Environment=PYTHONDONTWRITEBYTECODE=1
+LoadCredential=wordpress-token:/etc/dressv/wordpress-token
+LoadCredential=tls-cert:/etc/dressv/tls-cert
+LoadCredential=tls-key:/etc/dressv/tls-key
+ExecStart=/opt/dressv-https/.venv/bin/python -m dressv --mock --bind-v6 2404:a140:3d:7::f937 --allow-v6 2a0d:8480:2:241::1 --port 18444
+Restart=on-failure
+TimeoutStopSec=25
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_INET6 AF_UNIX
+IPAddressDeny=any
+IPAddressAllow=2a0d:8480:2:241::1/128
+UMask=0077
+LimitCORE=0
+LimitNOFILE=64
+TasksMax=16
+CPUQuota=100%
+MemoryMax=512M
+MemorySwapMax=0
+
+[Install]
+WantedBy=multi-user.target

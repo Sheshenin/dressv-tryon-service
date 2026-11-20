@@ -1,0 +1,17 @@
+[Unit]
+Description=Forward the Dress V TLS stream over the existing host IPv6 route
+
+[Service]
+ExecStart=/usr/lib/systemd/systemd-socket-proxyd --connections-max=8 --exit-idle-time=45s 2404:a140:3d:7::f937:18444
+DynamicUser=yes
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+IPAddressDeny=any
+IPAddressAllow=172.18.0.0/16 2a0d:8480:2:241::1/128 2404:a140:3d:7::f937/128
+LimitCORE=0
+MemoryMax=32M
+MemorySwapMax=0

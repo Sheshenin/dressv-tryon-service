@@ -1,0 +1,13 @@
+[Unit]
+Description=Dress V relay on the WordPress Docker bridge
+
+[Socket]
+ListenStream=172.18.0.1:18444
+FreeBind=yes
+BindToDevice=br-abd87f6e4179
+Backlog=8
+IPAddressDeny=any
+IPAddressAllow=172.18.0.0/16
+
+[Install]
+WantedBy=sockets.target
