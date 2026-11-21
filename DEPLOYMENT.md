@@ -1,6 +1,6 @@
 # Развёртывание и проверка Dress V
 
-Состояние подтверждено 20 ноября 2026 года. Все времена ниже указаны по Москве. На Hermes запущен HTTPS-сервис в режиме `mock` с серверным переключателем на совместимый Images Edits. Плагин WooCommerce работает на одной карточке для администраторов. Визуальная проверка и первый реальный вызов остаются в [плане](PLAN.md).
+Состояние подтверждено 20 ноября 2026 года. Все времена ниже указаны по Москве. На Hermes запущен HTTPS-сервис с OpenAI Images Edits. Плагин WooCommerce 0.1.4 работает на одной карточке для администраторов. Владелец подтвердил реальную генерацию. [Передача агенту сайта](SITE-HANDOFF.md).
 
 ## Хронология
 
@@ -31,7 +31,7 @@
 | WordPress, Compose | `/data/projects/bmk-rental-site/compose.override.yaml` | Дополнительное имя хоста и четыре монтирования только для сервиса `wordpress`. Исходный override сохранён в `/etc/dressv-wordpress/compose.override.before-dressv.yaml`. |
 | WordPress, systemd | `/etc/systemd/system/{dressv-wordpress-relay.socket,dressv-wordpress-relay.service,run-dressvuploads.mount}` | Реле на Docker-мосту и монтирование хранилища загрузок. Исходники установленных файлов находятся в [deploy](deploy/). |
 | WordPress, конфигурация | `/etc/dressv-wordpress/{ca-cert,wordpress-token,upload.ini}` | Публичный CA, токен для PHP и [настройки PHP](deploy/dressv-upload-tmp.ini). Токен имеет права `0400` для UID 33 (`www-data`). |
-| WordPress, плагин | `/home/bmk-admin/dressv-plugin.9ZmhJK` на хосте, `/var/www/html/wp-content/plugins/dressv-try-on` в контейнере | Staging и активный плагин 0.1.0. В WordPress опция `dressv_pilot` задаёт карточку, референс и промпт. Источники совпали с установленными PHP и JS по SHA-256. |
+| WordPress, плагин | `/home/bmk-admin/dressv-plugin.9ZmhJK` на хосте, `/var/www/html/wp-content/plugins/dressv-try-on` в контейнере | Первоначальный staging и путь активной установки 0.1.4. В WordPress опция `dressv_pilot` задаёт карточку, референс и промпт. Источники совпали с установленными PHP и JS по SHA-256. |
 
 При сверке в 21:49 шесть файлов Python из первоначальной HTTPS-сборки, три файла systemd на WordPress, HTTPS unit на Hermes и конфигурация PHP совпадали с рабочей копией по SHA-256. В 22:01 на Hermes обновлены `__main__.py`, `openai_images.py` и unit, добавлены `providers.py` и входной сетевой фильтр. В Git хранятся исходники, шаблоны и пути файлов. Значения токенов и закрытые ключи хранятся на серверах.
 

@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Dress V Try-On
  * Description: Закрытая ИИ-примерка Dress V для карточек WooCommerce.
- * Version: 0.1.0
+ * Version: 0.1.4
  * Requires PHP: 8.1
  */
 
@@ -16,7 +16,7 @@ final class DressV_Try_On {
 
     public static function register(): void {
         add_action('template_redirect', [self::class, 'prevent_cache']);
-        add_action('woocommerce_single_product_summary', [self::class, 'render'], 32);
+        add_action('woocommerce_before_add_to_cart_form', [self::class, 'render']);
         add_action('wp_ajax_dressv_try_on', [self::class, 'handle']);
     }
 
@@ -46,27 +46,55 @@ final class DressV_Try_On {
 
     public static function render(): void {
         $product_id = self::visible_product();
-        if (!self::pilot($product_id)) {
+        $settings = self::pilot($product_id);
+        if (!$settings) {
             return;
         }
-        wp_enqueue_script('dressv-try-on', plugins_url('dressv-try-on.js', __FILE__), [], '0.1.0', true);
+        wp_enqueue_style('dressv-try-on', plugins_url('dressv-try-on.css', __FILE__), [], '0.1.4');
+        wp_enqueue_script('dressv-try-on', plugins_url('dressv-try-on.js', __FILE__), [], '0.1.4', true);
         ?>
-        <details class="dressv-try-on">
-            <summary>Увидеть себя в образе</summary>
+        <div class="dressv-try-on">
+            <button type="button" class="button dressv-trigger" data-dressv-open aria-haspopup="dialog">Примерить образ на себя</button>
+            <dialog class="dressv-dialog" aria-labelledby="dressv-title-<?php echo esc_attr((string) $product_id); ?>">
+                <div class="dressv-heading">
+                    <h2 id="dressv-title-<?php echo esc_attr((string) $product_id); ?>">Примерить образ</h2>
+                    <button type="button" class="dressv-close" data-dressv-close aria-label="Закрыть">×</button>
+                </div>
             <form class="dressv-try-on-form"
                   data-url="<?php echo esc_url(admin_url('admin-ajax.php', 'relative')); ?>"
                   data-product="<?php echo esc_attr((string) $product_id); ?>"
                   data-nonce="<?php echo esc_attr(wp_create_nonce('dressv-pilot-' . $product_id)); ?>">
-                <p>Закрытая проверка. Загружайте только синтетические изображения.</p>
-                <p><label>Фото <input name="portrait" type="file" accept="image/jpeg,image/png,image/webp" required></label></p>
-                <p>
-                    <button type="submit">Создать образ</button>
-                    <button type="button" data-dressv-cancel hidden>Отменить</button>
-                </p>
-                <p role="status" aria-live="polite" data-dressv-status></p>
-                <img data-dressv-result alt="Результат примерки" hidden width="320">
+                <?php if (($settings['generation_mode'] ?? '') === 'live') : ?>
+                    <p>Загрузите фото, на котором хорошо видно лицо. Можно проверить несколько снимков по одному.</p>
+                <?php else : ?>
+                    <p>Тестовый режим. Сервис возвращает фиксированный PNG. Используйте синтетическое фото.</p>
+                <?php endif; ?>
+                <label class="dressv-upload">
+                    <span>Ваше фото</span>
+                    <input name="portrait" type="file" accept="image/jpeg,image/png,image/webp" required>
+                </label>
+                <div class="dressv-photos">
+                    <img data-dressv-preview alt="Выбранное фото" hidden>
+                    <button type="button" class="dressv-result-zoom" data-dressv-zoom aria-label="Открыть результат на весь экран" aria-haspopup="dialog" hidden>
+                        <img data-dressv-result alt="Результат примерки">
+                    </button>
+                </div>
+                <div class="dressv-actions">
+                    <button type="submit" class="button dressv-primary">Создать образ</button>
+                    <button type="button" class="button dressv-secondary" data-dressv-cancel hidden>Отменить</button>
+                </div>
+                <div class="dressv-wait" data-dressv-wait hidden>
+                    <div class="dressv-animation" aria-hidden="true"></div>
+                    <span data-dressv-time aria-hidden="true"></span>
+                </div>
+                <p class="dressv-status" role="status" aria-live="polite" data-dressv-status></p>
             </form>
-        </details>
+            </dialog>
+            <dialog class="dressv-fullscreen" aria-label="Результат примерки на весь экран">
+                <img data-dressv-full-image alt="Результат примерки">
+                <button type="button" class="dressv-close" data-dressv-full-close aria-label="Закрыть полноэкранный просмотр" autofocus>×</button>
+            </dialog>
+        </div>
         <?php
     }
 

@@ -1,0 +1,14 @@
+{
+  "product_id": 200,
+  "references": [201, 202],
+  "generation_mode": "mock",
+  "prompt": "Create one vertical, photorealistic, full-length event portrait. Image 1 is the sole reference for the person: keep the same recognizable facial features, skin tone and apparent age, with a natural relaxed expression. Images 2 and 3 show the same outfit from two angles and are references only for the clothing, shoes and accessories. Dress the person in the matching deep-red tailored jacket and loose red trousers, the dark bronze-gold knit top visible beneath the open jacket, and the tall structured tan-and-dark tiger-stripe hat. Include the chunky gold chain, rings and patterned dark sneakers shown in the outfit reference. Match the silhouette, materials and colors. Keep both shoes, the entire hat and the full outfit in frame. Use a relaxed standing pose, a dark neutral event backdrop and soft editorial lighting that separates the red suit from the backdrop. The eyes and face should remain well lit and unobstructed. Keep the uploaded person's identity and do not copy the catalog model's features, hair or pose. No red bowler hat, extra people, unrelated accessories or text.",
+  "required_details": [
+    "Recognizable person from image 1 with visible facial features",
+    "Matching deep-red tailored jacket and loose red trousers",
+    "Dark bronze-gold knit top under the open jacket",
+    "Tall structured tan-and-dark tiger-stripe hat, with no red bowler",
+    "Chunky gold chain, rings and patterned dark sneakers",
+    "Full-length portrait with the entire hat and both shoes in frame"
+  ]
+}
