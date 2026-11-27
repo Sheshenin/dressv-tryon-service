@@ -1,14 +1,17 @@
 <?php
 /**
  * Plugin Name: Dress V Try-On
- * Description: Закрытая ИИ-примерка Dress V для карточек WooCommerce.
- * Version: 0.1.4
+ * Description: ИИ-примерка Dress V для карточек WooCommerce.
+ * Version: 0.1.5
  * Requires PHP: 8.1
  */
 
 defined('ABSPATH') || exit;
 
 final class DressV_Try_On {
+    private const PUBLIC_ACCESS_OPTION = 'dressv_public_access';
+    private const SETTINGS_PAGE = 'dressv-try-on';
+    private const GUEST_COOKIE = '__Host-dressv-session';
     private const MAX_INPUT = 16777216;
     private const MAX_RESULT = 8388608;
     private const ENDPOINT = 'https://dressv-hermes.internal:18444';
@@ -18,14 +21,98 @@ final class DressV_Try_On {
         add_action('template_redirect', [self::class, 'prevent_cache']);
         add_action('woocommerce_before_add_to_cart_form', [self::class, 'render']);
         add_action('wp_ajax_dressv_try_on', [self::class, 'handle']);
+        add_action('wp_ajax_nopriv_dressv_try_on', [self::class, 'handle']);
+        add_action('admin_menu', [self::class, 'add_settings_page']);
+        add_action('admin_init', [self::class, 'register_settings']);
+        add_filter('plugin_action_links_' . plugin_basename(__FILE__), [self::class, 'settings_link']);
+    }
+
+    public static function add_settings_page(): void {
+        add_options_page('Dress V', 'Dress V', 'manage_options', self::SETTINGS_PAGE, [self::class, 'render_settings']);
+    }
+
+    public static function register_settings(): void {
+        register_setting(self::SETTINGS_PAGE, self::PUBLIC_ACCESS_OPTION, [
+            'type' => 'string',
+            'default' => '0',
+            'sanitize_callback' => static fn ($value): string => $value === '1' ? '1' : '0',
+        ]);
+    }
+
+    public static function settings_link(array $links): array {
+        $url = admin_url('options-general.php?page=' . self::SETTINGS_PAGE);
+        array_unshift($links, '<a href="' . esc_url($url) . '">Настройки</a>');
+        return $links;
+    }
+
+    public static function render_settings(): void {
+        if (!current_user_can('manage_options')) {
+            wp_die('У вас нет доступа к настройкам Dress V.', '', ['response' => 403]);
+        }
+        ?>
+        <div class="wrap">
+            <h1>Dress V</h1>
+            <form action="options.php" method="post">
+                <?php settings_fields(self::SETTINGS_PAGE); ?>
+                <table class="form-table" role="presentation">
+                    <tr>
+                        <th scope="row">Доступ к примерке</th>
+                        <td>
+                            <input type="hidden" name="<?php echo esc_attr(self::PUBLIC_ACCESS_OPTION); ?>" value="0">
+                            <label>
+                                <input type="checkbox" name="<?php echo esc_attr(self::PUBLIC_ACCESS_OPTION); ?>"
+                                       value="1" <?php checked(self::public_enabled()); ?>>
+                                Разрешить примерку всем посетителям
+                            </label>
+                            <p class="description">Действует сразу на всех карточках с профилем Dress V. Если флажок снят, примерка доступна только администраторам.</p>
+                        </td>
+                    </tr>
+                </table>
+                <?php submit_button('Сохранить настройки'); ?>
+            </form>
+        </div>
+        <?php
+    }
+
+    public static function public_enabled(): bool {
+        return (string) get_option(self::PUBLIC_ACCESS_OPTION, '0') === '1';
+    }
+
+    public static function can_access(): bool {
+        return current_user_can('manage_options') || self::public_enabled();
+    }
+
+    private static function guest_session(): string {
+        $cookie = $_COOKIE[self::GUEST_COOKIE] ?? '';
+        return is_string($cookie) && preg_match('/\A[a-f0-9]{64}\z/', $cookie) ? $cookie : '';
+    }
+
+    private static function session(): string {
+        return is_user_logged_in() ? wp_get_session_token() : self::guest_session();
+    }
+
+    private static function nonce(int $product_id, string $session): string {
+        $action = 'dressv-pilot-' . $product_id;
+        return is_user_logged_in()
+            ? wp_create_nonce($action)
+            : hash_hmac('sha256', $action . ':' . $session, wp_salt('nonce'));
+    }
+
+    private static function valid_nonce(int $product_id, string $session): bool {
+        if (is_user_logged_in()) {
+            return (bool) check_ajax_referer('dressv-pilot-' . $product_id, 'nonce', false);
+        }
+        return hash_equals(self::nonce($product_id, $session), self::field('nonce'));
     }
 
     private static function pilot(int $product_id): array {
-        $settings = get_option('dressv_pilot', []);
-        if (
-            !current_user_can('manage_options') || $product_id < 1
-            || !is_array($settings) || (int) ($settings['product_id'] ?? 0) !== $product_id
+        if ($product_id < 1 || !self::can_access()
+            || get_post_type($product_id) !== 'product' || get_post_status($product_id) !== 'publish'
         ) {
+            return [];
+        }
+        $settings = get_option('dressv_pilot', []);
+        if (!is_array($settings) || (int) ($settings['product_id'] ?? 0) !== $product_id) {
             return [];
         }
         return $settings;
@@ -36,22 +123,36 @@ final class DressV_Try_On {
     }
 
     public static function prevent_cache(): void {
-        if (self::pilot(self::visible_product())) {
-            if (!defined('DONOTCACHEPAGE')) {
-                define('DONOTCACHEPAGE', true);
+        if (!self::pilot(self::visible_product())) {
+            return;
+        }
+        if (!defined('DONOTCACHEPAGE')) {
+            define('DONOTCACHEPAGE', true);
+        }
+        nocache_headers();
+        if (!is_user_logged_in() && self::guest_session() === '' && is_ssl()) {
+            $session = bin2hex(random_bytes(32));
+            if (setcookie(self::GUEST_COOKIE, $session, [
+                'expires' => time() + DAY_IN_SECONDS,
+                'path' => '/',
+                'secure' => true,
+                'httponly' => true,
+                'samesite' => 'Lax',
+            ])) {
+                $_COOKIE[self::GUEST_COOKIE] = $session;
             }
-            nocache_headers();
         }
     }
 
     public static function render(): void {
         $product_id = self::visible_product();
         $settings = self::pilot($product_id);
-        if (!$settings) {
+        $session = self::session();
+        if (!$settings || $session === '') {
             return;
         }
-        wp_enqueue_style('dressv-try-on', plugins_url('dressv-try-on.css', __FILE__), [], '0.1.4');
-        wp_enqueue_script('dressv-try-on', plugins_url('dressv-try-on.js', __FILE__), [], '0.1.4', true);
+        wp_enqueue_style('dressv-try-on', plugins_url('dressv-try-on.css', __FILE__), [], '0.1.5');
+        wp_enqueue_script('dressv-try-on', plugins_url('dressv-try-on.js', __FILE__), [], '0.1.5', true);
         ?>
         <div class="dressv-try-on">
             <button type="button" class="button dressv-trigger" data-dressv-open aria-haspopup="dialog">Примерить образ на себя</button>
@@ -63,7 +164,7 @@ final class DressV_Try_On {
             <form class="dressv-try-on-form"
                   data-url="<?php echo esc_url(admin_url('admin-ajax.php', 'relative')); ?>"
                   data-product="<?php echo esc_attr((string) $product_id); ?>"
-                  data-nonce="<?php echo esc_attr(wp_create_nonce('dressv-pilot-' . $product_id)); ?>">
+                  data-nonce="<?php echo esc_attr(self::nonce($product_id, $session)); ?>">
                 <?php if (($settings['generation_mode'] ?? '') === 'live') : ?>
                     <p>Загрузите фото, на котором хорошо видно лицо. Можно проверить несколько снимков по одному.</p>
                 <?php else : ?>
@@ -103,17 +204,14 @@ final class DressV_Try_On {
         header('Cache-Control: private, no-store');
         $product_id = isset($_POST['product']) && is_scalar($_POST['product']) ? absint($_POST['product']) : 0;
         $settings = self::pilot($product_id);
+        $session = self::session();
         if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST' || !$settings
-            || !check_ajax_referer('dressv-pilot-' . $product_id, 'nonce', false)
+            || $session === '' || !self::valid_nonce($product_id, $session)
         ) {
-            wp_send_json_error(['message' => 'Примерка недоступна.'], 403);
+            wp_send_json_error(['message' => 'Примерка недоступна. Обновите страницу.'], 403);
         }
 
         $action = self::field('operation');
-        $session = wp_get_session_token();
-        if ($session === '') {
-            wp_send_json_error(['message' => 'Обновите страницу и войдите снова.'], 403);
-        }
         $owner = hash_hmac('sha256', get_current_user_id() . ':' . $product_id . ':' . $session, wp_salt('auth'));
         try {
             if ($action === 'create') {
